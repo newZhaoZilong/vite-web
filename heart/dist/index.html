@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>璀璨粒子实心爱心</title>
+    <style>
+        body, html {
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            overflow: hidden; background-color: #000;
+        }
+        canvas { display: block; touch-action: none; }
+        #name-container {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #ff2d55;
+            font-family: "Microsoft YaHei", "SimHei", sans-serif;
+            font-size: 8vw; /* 适配移动端 */
+            font-weight: bold;
+            text-shadow: 0 0 20px rgba(255, 45, 85, 0.8), 0 0 40px rgba(255, 45, 85, 0.4);
+            pointer-events: none;
+            user-select: none;
+            z-index: 10;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="name-container">丫头</div>
+    <canvas id="heart"></canvas>
+
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const nameParam = urlParams.get('name');
+        if (nameParam) {
+            document.getElementById('name-container').innerText = decodeURIComponent(nameParam);
+        }
+
+        setTimeout(() => {
+            const canvas = document.getElementById('heart');
+            const ctx = canvas.getContext('2d');
+
+            let width, height;
+            let particles = [];
+            const particleCount = 2500; // 填充实心需要更多粒子
+            let heartRadius;
+
+            function resize() {
+                width = canvas.width = window.innerWidth;
+                height = canvas.height = window.innerHeight;
+                // 固定宽度为 80vw 逻辑
+                heartRadius = width * 0.025; 
+            }
+            window.addEventListener('resize', resize);
+            resize();
+
+            // 心形公式
+            function getHeartPoint(t) {
+                return {
+                    x: 16 * Math.pow(Math.sin(t), 3),
+                    y: -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t)) - 2 // 向上偏移2单位
+                };
+            }
+
+            class Particle {
+                constructor() {
+                    this.init(true);
+                }
+
+                init(firstTime = false) {
+                    this.t = Math.random() * Math.PI * 2;
+                    const point = getHeartPoint(this.t);
+                    
+                    // --- 关键修改：实心填充逻辑 ---
+                    // 通过 Math.sqrt 让随机分布更均匀地填充在内部
+                    const rand = Math.sqrt(Math.random()); 
+                    this.targetX = point.x * heartRadius * rand + width / 2;
+                    this.targetY = point.y * heartRadius * rand + height / 2;
+                    
+                    if (firstTime) {
+                        this.x = Math.random() * width;
+                        this.y = Math.random() * height;
+                    } else {
+                        this.x = width / 2;
+                        this.y = height / 2;
+                    }
+                    
+                    this.size = Math.random() * 1.5 + 0.3;
+                    this.speed = Math.random() * 0.03 + 0.01;
+                    
+                    const r = 255;
+                    const g = Math.floor(Math.random() * 60 + 20);
+                    const b = Math.floor(Math.random() * 100 + 100);
+                    this.color = `rgba(${r}, ${g}, ${b}, ${Math.random() * 0.5 + 0.4})`;
+                }
+
+                update(tick) {
+                    const beat = Math.sin(tick * 0.05) * 0.08 + 1;
+                    const curTargetX = (this.targetX - width / 2) * beat + width / 2;
+                    const curTargetY = (this.targetY - height / 2) * beat + height / 2;
+
+                    this.x += (curTargetX - this.x) * this.speed;
+                    this.y += (curTargetY - this.y) * this.speed;
+
+                    this.x += (Math.random() - 0.5) * 0.6;
+                    this.y += (Math.random() - 0.5) * 0.6;
+                }
+
+                draw() {
+                    ctx.fillStyle = this.color;
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+
+            for (let i = 0; i < particleCount; i++) {
+                particles.push(new Particle());
+            }
+
+            let tick = 0;
+            function animate() {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
+                ctx.fillRect(0, 0, width, height);
+
+                tick++;
+                particles.forEach(p => {
+                    p.update(tick);
+                    p.draw();
+                });
+
+                requestAnimationFrame(animate);
+            }
+
+            animate();
+        }, 100); // 缩短延迟，提升体验
+    </script>
+</body>
+</html>
