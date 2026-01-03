@@ -1,25 +1,35 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>动态变色粒子心</title>
     <style>
-        body, html {
-            margin: 0; padding: 0; width: 100%; height: 100%;
-            overflow: hidden; background-color: #000;
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #000;
         }
-        canvas { 
-            display: block; 
-            touch-action: none; 
+
+        canvas {
+            display: block;
+            touch-action: none;
             width: 100% !important;
             height: 100% !important;
         }
+
         #name-container {
             position: absolute;
-            top: 50%; left: 50%;
+            top: 50%;
+            left: 50%;
             transform: translate(-50%, -50%);
-            color: #ffffff; 
+            color: #ffffff;
             font-family: "PingFang SC", "STHeiti", "Microsoft YaHei", sans-serif;
             font-size: 8vw;
             font-weight: bold;
@@ -27,11 +37,12 @@
             user-select: none;
             z-index: 10;
             opacity: 0;
-            transition: opacity 2s ease-in-out; 
+            transition: opacity 2s ease-in-out;
             white-space: nowrap;
         }
     </style>
 </head>
+
 <body>
 
     <div id="name-container">&nbsp;</div>
@@ -40,7 +51,7 @@
     <script>
         // --- 1. 参数获取与颜色变量初始化 ---
         const urlParams = new URLSearchParams(window.location.search);
-        
+
         // 处理名字：如果有参数则显示参数，否则保持为空格
         const nameParam = urlParams.get('name');
         if (nameParam) {
@@ -73,7 +84,7 @@
             }
         }
 
-        document.getElementById('name-container').style.textShadow = 
+        document.getElementById('name-container').style.textShadow =
             `0 0 15px hsla(${baseHue}, 90%, 70%, 0.9), 0 0 30px hsla(${baseHue}, 90%, 40%, 0.7)`;
 
         // --- 2. Canvas 核心逻辑（拒绝采样法，确保均匀无中线） ---
@@ -85,8 +96,15 @@
 
         function updateSize() {
             dpr = window.devicePixelRatio || 1;
-            width = window.innerWidth || document.documentElement.clientWidth;
-            height = window.innerHeight || document.documentElement.clientHeight;
+            // 兼容多浏览器宽高获取
+            width = window.innerWidth || document.documentElement.clientWidth || document.body.clientWidth;
+            height = window.innerHeight || document.documentElement.clientHeight || document.body.clientHeight;
+
+            // 极端情况防御
+            if (width === 0 || height === 0) {
+                width = screen.width;
+                height = screen.height;
+            }
             canvas.width = width * dpr;
             canvas.height = height * dpr;
             ctx.scale(dpr, dpr);
@@ -95,7 +113,7 @@
         }
 
         function isInsideHeart(x, y) {
-            y = y * 1.2; 
+            y = y * 1.2;
             const a = x * x + y * y - 1;
             return Math.pow(a, 3) - x * x * Math.pow(y, 3) <= 0;
         }
@@ -121,7 +139,7 @@
                 this.size = Math.random() * 1.5 + 0.5;
                 this.speed = Math.random() * 0.03 + 0.01;
                 const dist = Math.sqrt(this.originX * this.originX + this.originY * this.originY);
-                const l = 75 - (dist * 35); 
+                const l = 75 - (dist * 35);
                 this.color = `hsla(${baseHue}, 95%, ${l}%, ${Math.random() * 0.4 + 0.5})`;
             }
             update(tick) {
@@ -162,4 +180,5 @@
         else window.addEventListener('load', start);
     </script>
 </body>
+
 </html>
