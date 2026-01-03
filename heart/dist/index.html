@@ -1,88 +1,46 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
-
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport"
-        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>动态变色粒子心</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>立体质感粒子心</title>
     <style>
-        body,
-        html {
-            margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-            background-color: #000;
-        }
-
-        canvas {
-            display: block;
-            touch-action: none;
-            width: 100% !important;
-            height: 100% !important;
-        }
-
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background-color: #000; }
+        canvas { display: block; touch-action: none; width: 100% !important; height: 100% !important; }
         #name-container {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: #ffffff;
-            font-family: "PingFang SC", "STHeiti", "Microsoft YaHei", sans-serif;
-            font-size: 8vw;
-            font-weight: bold;
-            pointer-events: none;
-            user-select: none;
-            z-index: 10;
-            opacity: 0;
-            /* 恢复点 1：文字渐变时间恢复为 2s，保持灵动 */
-            transition: opacity 2s ease-in-out;
-            white-space: nowrap;
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            color: #ffffff; font-family: "PingFang SC", "STHeiti", sans-serif;
+            font-size: 8vw; font-weight: bold; pointer-events: none; user-select: none;
+            z-index: 10; opacity: 0; transition: opacity 2s ease-in-out; white-space: nowrap;
         }
     </style>
 </head>
-
 <body>
-
     <div id="name-container">&nbsp;</div>
     <canvas id="heart"></canvas>
 
     <script>
         const urlParams = new URLSearchParams(window.location.search);
         const nameParam = urlParams.get('name');
-        if (nameParam) {
-            document.getElementById('name-container').innerText = decodeURIComponent(nameParam);
-        } else {
-            document.getElementById('name-container').innerHTML = '&nbsp;';
-        }
+        if (nameParam) document.getElementById('name-container').innerText = decodeURIComponent(nameParam);
 
         let baseHue = 355; 
         const colorParam = urlParams.get('color');
-
         if (colorParam) {
             const tempDiv = document.createElement("div");
             tempDiv.style.color = colorParam.startsWith('#') ? colorParam : '#' + colorParam;
             document.body.appendChild(tempDiv);
             const rgbColor = window.getComputedStyle(tempDiv).color;
-            document.body.removeChild(tempDiv);
             const match = rgbColor.match(/\d+/g);
             if (match) {
                 let [r, g, b] = match.map(Number);
                 r /= 255; g /= 255; b /= 255;
                 const max = Math.max(r, g, b), min = Math.min(r, g, b);
-                let h;
-                if (max === min) h = 0;
-                else if (max === r) h = (g - b) / (max - min) + (g < b ? 6 : 0);
-                else if (max === g) h = (b - r) / (max - min) + 2;
-                else h = (r - g) / (max - min) + 4;
+                let h = max === min ? 0 : max === r ? (g - b) / (max - min) + (g < b ? 6 : 0) : max === g ? (b - r) / (max - min) + 2 : (r - g) / (max - min) + 4;
                 baseHue = Math.round(h * 60);
             }
+            document.body.removeChild(tempDiv);
         }
-
-        document.getElementById('name-container').style.textShadow =
-            `0 0 15px hsla(${baseHue}, 90%, 70%, 0.9), 0 0 30px hsla(${baseHue}, 90%, 40%, 0.7)`;
 
         const canvas = document.getElementById('heart');
         const ctx = canvas.getContext('2d');
@@ -107,7 +65,7 @@
         }
 
         function isInsideHeart(x, y) {
-            y = y * 1.2;
+            y = y * 1.2; 
             const a = x * x + y * y - 1;
             return Math.pow(a, 3) - x * x * Math.pow(y, 3) <= 0;
         }
@@ -123,6 +81,9 @@
                     if (safeGuard > 400) break;
                 } while (!isInsideHeart(x, y));
                 this.originX = x; this.originY = y;
+                // 计算一个虚拟的 Z 深度 (模拟球体表面)
+                this.z = Math.sqrt(Math.max(0, 1 - (x*x + y*y))); 
+                
                 this.targetX = x * heartRadius + width / 2;
                 this.targetY = -(y - 0.3) * heartRadius + height / 2;
             }
@@ -131,50 +92,59 @@
                 this.x = firstTime ? Math.random() * width : width / 2;
                 this.y = firstTime ? Math.random() * height : height / 2;
                 this.size = Math.random() * 1.5 + 0.5;
-                /* 修改点：粒子汇聚速度调得更慢 (0.008 左右)，产生丝滑流转感 */
+                // 保持慢速动画
                 this.speed = Math.random() * 0.008 + 0.004;
+                
+                // 基于位置和 Z 深度的立体着色
+                // 1. 距离中心越近且 Z 越高（微凸处）亮度越高
                 const dist = Math.sqrt(this.originX * this.originX + this.originY * this.originY);
-                const l = 75 - (dist * 35);
-                this.color = `hsla(${baseHue}, 95%, ${l}%, ${Math.random() * 0.4 + 0.5})`;
+                // 模拟左上方高光 (x: -0.5, y: 0.5)
+                const lightPos = Math.sqrt(Math.pow(this.originX+0.5, 2) + Math.pow(this.originY-0.5, 2));
+                const l = 80 - (lightPos * 25) + (this.z * 15); 
+                
+                this.color = `hsla(${baseHue}, 95%, ${Math.max(20, l)}%, ${Math.random() * 0.3 + 0.6})`;
             }
             update(tick) {
+                // 稍微加入一点 Z 轴带来的呼吸感位移
                 const beat = Math.sin(tick * 0.025) * 0.07 + 1;
                 const tx = (this.targetX - width / 2) * beat + width / 2;
                 const ty = (this.targetY - height / 2) * beat + height / 2;
-                this.x += (tx - this.x) * this.speed;
+                
+                // 模拟极其微小的立体偏转
+                const tilt = Math.sin(tick * 0.01) * 3 * this.z;
+                
+                this.x += (tx + tilt - this.x) * this.speed;
                 this.y += (ty - this.y) * this.speed;
-                this.x += (Math.random() - 0.5) * 0.5;
-                this.y += (Math.random() - 0.5) * 0.5;
+                this.x += (Math.random() - 0.5) * 0.4;
+                this.y += (Math.random() - 0.5) * 0.4;
             }
             draw() {
                 ctx.fillStyle = this.color;
                 ctx.beginPath();
-                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                // 近大远小：根据 Z 轴微调粒子大小
+                const s = this.size * (1 + this.z * 0.5);
+                ctx.arc(this.x, this.y, s, 0, Math.PI * 2);
                 ctx.fill();
             }
         }
 
         function start() {
             updateSize();
-            if (particles.length === 0) {
-                for (let i = 0; i < particleCount; i++) particles.push(new Particle());
-            }
+            for (let i = 0; i < particleCount; i++) particles.push(new Particle());
             animate();
-            /* 恢复点 2：名字在 1.8s 后就开始显现，与粒子悠长的汇聚形成对比 */
             setTimeout(() => { document.getElementById('name-container').style.opacity = '1'; }, 1800);
         }
 
         function animate() {
-            ctx.fillStyle = `hsla(${baseHue}, 20%, 5%, 0.15)`;
+            ctx.fillStyle = `hsla(${baseHue}, 20%, 5%, 0.18)`;
             ctx.fillRect(0, 0, width, height);
-            particles.forEach(p => { p.update(Date.now() * 0.025); p.draw(); });
+            const now = Date.now() * 0.025;
+            particles.forEach(p => { p.update(now); p.draw(); });
             requestAnimationFrame(animate);
         }
 
         window.addEventListener('resize', updateSize);
-        if (document.readyState === 'complete') start();
-        else window.addEventListener('load', start);
+        window.onload = start;
     </script>
 </body>
-
 </html>
