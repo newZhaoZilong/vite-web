@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>完美红色渐变爱心</title>
+    <title>动态变色粒子心</title>
     <style>
         body, html {
             margin: 0; padding: 0; width: 100%; height: 100%;
@@ -15,17 +15,14 @@
             width: 100% !important;
             height: 100% !important;
         }
-        
         #name-container {
             position: absolute;
-            top: 50%;
-            left: 50%;
+            top: 50%; left: 50%;
             transform: translate(-50%, -50%);
             color: #ffffff; 
             font-family: "PingFang SC", "STHeiti", "Microsoft YaHei", sans-serif;
             font-size: 8vw;
             font-weight: bold;
-            text-shadow: 0 0 15px rgba(255, 80, 80, 0.9), 0 0 30px rgba(200, 0, 0, 0.7);
             pointer-events: none;
             user-select: none;
             z-index: 10;
@@ -37,49 +34,64 @@
 </head>
 <body>
 
-    <div id="name-container">丫头</div>
+    <div id="name-container">&nbsp;</div>
     <canvas id="heart"></canvas>
 
     <script>
-        // --- 1. 参数获取兼容处理 ---
+        // --- 1. 参数获取与颜色变量初始化 ---
         const urlParams = new URLSearchParams(window.location.search);
+        
+        // 处理名字：如果有参数则显示参数，否则保持为空格
         const nameParam = urlParams.get('name');
         if (nameParam) {
             document.getElementById('name-container').innerText = decodeURIComponent(nameParam);
+        } else {
+            document.getElementById('name-container').innerHTML = '&nbsp;';
         }
 
+        // 处理颜色变量（保持你之前的动态变色逻辑）
+        let baseHue = 355; // 默认红色
+        const colorParam = urlParams.get('color');
+
+        if (colorParam) {
+            const tempDiv = document.createElement("div");
+            tempDiv.style.color = colorParam.startsWith('#') ? colorParam : '#' + colorParam;
+            document.body.appendChild(tempDiv);
+            const rgbColor = window.getComputedStyle(tempDiv).color;
+            document.body.removeChild(tempDiv);
+            const match = rgbColor.match(/\d+/g);
+            if (match) {
+                let [r, g, b] = match.map(Number);
+                r /= 255; g /= 255; b /= 255;
+                const max = Math.max(r, g, b), min = Math.min(r, g, b);
+                let h;
+                if (max === min) h = 0;
+                else if (max === r) h = (g - b) / (max - min) + (g < b ? 6 : 0);
+                else if (max === g) h = (b - r) / (max - min) + 2;
+                else h = (r - g) / (max - min) + 4;
+                baseHue = Math.round(h * 60);
+            }
+        }
+
+        document.getElementById('name-container').style.textShadow = 
+            `0 0 15px hsla(${baseHue}, 90%, 70%, 0.9), 0 0 30px hsla(${baseHue}, 90%, 40%, 0.7)`;
+
+        // --- 2. Canvas 核心逻辑（拒绝采样法，确保均匀无中线） ---
         const canvas = document.getElementById('heart');
         const ctx = canvas.getContext('2d');
-        
-        let width, height, dpr;
+        let width, height, dpr, heartRadius;
         let particles = [];
-        const particleCount = 2800; 
-        let heartRadius;
+        const particleCount = 2800;
 
-        // --- 2. 增强版宽高获取函数 ---
         function updateSize() {
             dpr = window.devicePixelRatio || 1;
-            // 兼容多浏览器宽高获取
-            width = window.innerWidth || document.documentElement.clientWidth || document.body.clientWidth;
-            height = window.innerHeight || document.documentElement.clientHeight || document.body.clientHeight;
-            
-            // 极端情况防御
-            if (width === 0 || height === 0) {
-                width = screen.width;
-                height = screen.height;
-            }
-
+            width = window.innerWidth || document.documentElement.clientWidth;
+            height = window.innerHeight || document.documentElement.clientHeight;
             canvas.width = width * dpr;
             canvas.height = height * dpr;
             ctx.scale(dpr, dpr);
-            
-            // 心形大小比例适配
             heartRadius = Math.min(width, height) * 0.35;
-            
-            // 如果已经在运行，通知所有粒子更新目标位置
-            if (particles.length > 0) {
-                particles.forEach(p => p.updateTarget());
-            }
+            if (particles.length > 0) particles.forEach(p => p.updateTarget());
         }
 
         function isInsideHeart(x, y) {
@@ -89,10 +101,7 @@
         }
 
         class Particle {
-            constructor() {
-                this.init(true);
-            }
-
+            constructor() { this.init(true); }
             updateTarget() {
                 let x, y, safeGuard = 0;
                 do {
@@ -101,44 +110,29 @@
                     safeGuard++;
                     if (safeGuard > 400) break;
                 } while (!isInsideHeart(x, y));
-                
-                this.originX = x;
-                this.originY = y;
+                this.originX = x; this.originY = y;
                 this.targetX = x * heartRadius + width / 2;
                 this.targetY = -(y - 0.3) * heartRadius + height / 2;
             }
-
             init(firstTime = false) {
                 this.updateTarget();
-                if (firstTime) {
-                    this.x = Math.random() * width;
-                    this.y = Math.random() * height;
-                } else {
-                    this.x = width / 2;
-                    this.y = height / 2;
-                }
-                this.size = (Math.random() * 1.5 + 0.5);
+                this.x = firstTime ? Math.random() * width : width / 2;
+                this.y = firstTime ? Math.random() * height : height / 2;
+                this.size = Math.random() * 1.5 + 0.5;
                 this.speed = Math.random() * 0.03 + 0.01;
-                
                 const dist = Math.sqrt(this.originX * this.originX + this.originY * this.originY);
-                const h = 355; 
-                const s = 95;
-                const l = 75 - (dist * 35);
-                const a = Math.random() * 0.4 + 0.5;
-                this.color = `hsla(${h}, ${s}%, ${l}%, ${a})`;
+                const l = 75 - (dist * 35); 
+                this.color = `hsla(${baseHue}, 95%, ${l}%, ${Math.random() * 0.4 + 0.5})`;
             }
-
             update(tick) {
                 const beat = Math.sin(tick * 0.05) * 0.07 + 1;
                 const tx = (this.targetX - width / 2) * beat + width / 2;
                 const ty = (this.targetY - height / 2) * beat + height / 2;
-                
                 this.x += (tx - this.x) * this.speed;
                 this.y += (ty - this.y) * this.speed;
                 this.x += (Math.random() - 0.5) * 0.5;
                 this.y += (Math.random() - 0.5) * 0.5;
             }
-
             draw() {
                 ctx.fillStyle = this.color;
                 ctx.beginPath();
@@ -147,46 +141,25 @@
             }
         }
 
-        // --- 3. 启动逻辑 ---
         function start() {
             updateSize();
             if (particles.length === 0) {
-                for (let i = 0; i < particleCount; i++) {
-                    particles.push(new Particle());
-                }
+                for (let i = 0; i < particleCount; i++) particles.push(new Particle());
             }
             animate();
-            
-            // 延迟显示文字
-            setTimeout(() => {
-                document.getElementById('name-container').style.opacity = '1';
-            }, 1800);
+            setTimeout(() => { document.getElementById('name-container').style.opacity = '1'; }, 1800);
         }
 
-        let tick = 0;
         function animate() {
-            ctx.fillStyle = 'rgba(15, 0, 0, 0.15)';
+            ctx.fillStyle = `hsla(${baseHue}, 20%, 5%, 0.15)`;
             ctx.fillRect(0, 0, width, height);
-            tick++;
-            particles.forEach(p => {
-                p.update(tick);
-                p.draw();
-            });
+            particles.forEach(p => { p.update(Date.now() * 0.05); p.draw(); });
             requestAnimationFrame(animate);
         }
 
-        // 多次触发 resize 确保宽高抓取成功
         window.addEventListener('resize', updateSize);
-        window.addEventListener('orientationchange', () => {
-            setTimeout(updateSize, 300);
-        });
-
-        // 确保页面资源加载或 DOM 准备好后再启动
-        if (document.readyState === 'complete') {
-            start();
-        } else {
-            window.addEventListener('load', start);
-        }
+        if (document.readyState === 'complete') start();
+        else window.addEventListener('load', start);
     </script>
 </body>
 </html>
