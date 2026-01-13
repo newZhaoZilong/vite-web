@@ -12,9 +12,7 @@
             color: #ffffff; font-family: "PingFang SC", "STHeiti", sans-serif;
             font-size: 8vw; font-weight: bold; pointer-events: none; user-select: none;
             z-index: 10; 
-            /* 初始全透明 */
             opacity: 0; 
-            /* 设置一个较长的淡入时间，增加仪式感 */
             transition: opacity 3s ease-in-out; 
             white-space: nowrap;
         }
@@ -27,7 +25,13 @@
     <script>
         const urlParams = new URLSearchParams(window.location.search);
         const nameParam = urlParams.get('name');
-        if (nameParam) document.getElementById('name-container').innerText = decodeURIComponent(nameParam);
+        
+        // --- 修改部分：同步更新页面文字和浏览器标题 ---
+        if (nameParam) {
+            const decodedName = decodeURIComponent(nameParam);
+            document.getElementById('name-container').innerText = decodedName;
+            document.title = decodedName; // 这里将网页标题修改为和 name 一样
+        }
 
         let baseHue = 355; 
         const colorParam = urlParams.get('color');
@@ -127,8 +131,6 @@
             for (let i = 0; i < particleCount; i++) particles.push(new Particle());
             animate();
             
-            // --- 核心修改：延迟到心形绘制基本完成再显示 ---
-            // 粒子汇聚较慢，设置 3.5 秒后开始淡入
             setTimeout(() => { 
                 document.getElementById('name-container').style.opacity = '1'; 
             }, 3000); 
