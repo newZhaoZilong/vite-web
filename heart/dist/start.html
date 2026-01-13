@@ -5,235 +5,186 @@
     <meta charset="UTF-8">
     <title>星海情书</title>
     <style>
-        body {
-            margin: 0;
-            overflow: hidden;
-            background-color: #050515;
-        }
-
-        #canvas-container {
-            width: 100vw;
-            height: 100vh;
-        }
-
+        body { margin: 0; overflow: hidden; background-color: #050515; }
+        #canvas-container { width: 100vw; height: 100vh; }
         #message {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: white;
-            font-size: 24px;
-            font-family: "Microsoft YaHei", sans-serif;
-            text-align: center;
-            cursor: pointer;
-            user-select: none;
-            text-shadow: 0 0 10px rgba(255, 255, 255, 0.7);
-            z-index: 10;
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            color: white; font-size: 24px; font-family: "Microsoft YaHei", sans-serif;
+            text-align: center; cursor: pointer; user-select: none;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.7); z-index: 10;
         }
-
-        #message:hover {
-            color: #ffe0b2;
-            text-shadow: 0 0 15px rgba(255, 255, 255, 1);
-        }
-
-        .loading-text {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: rgba(255, 255, 255, 0.7);
-            font-family: "Microsoft YaHei", sans-serif;
-            font-size: 18px;
-            z-index: 9;
-        }
+        #message:hover { color: #ffe0b2; text-shadow: 0 0 15px rgba(255, 255, 255, 1); }
     </style>
 </head>
 
 <body>
     <div id="canvas-container"></div>
-    <div class="loading-text">加载字体中...</div>
-    <div id="message" style="display:none;">点击这里，开启星辰物语 ✨</div>
+    <div id="message">点击这里，开启星辰物语 ✨</div>
 
     <script type="importmap">
     {
         "imports": {
             "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-            "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
             "@tweenjs/tween.js": "https://unpkg.com/@tweenjs/tween.js@23.1.1/dist/tween.esm.js"
         }
     }
-</script>
+    </script>
 
     <script type="module">
-
-
         import * as THREE from 'three';
-        import { FontLoader } from 'three/addons/loaders/FontLoader.js';
-        import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
-        import * as TWEEN from '@tweenjs/tween.js'; // 使用新的导入方式
+        import * as TWEEN from '@tweenjs/tween.js';
 
-        // --- 全局变量 ---
-        let scene, camera, renderer;
-        let particles;
-        let originalPositions = []; // 散乱的初始位置
-        let targetPositions = [];   // 汇聚后的文字位置
-        let particleCount = 20000; // 粒子数量
+        // --- 参数配置 ---
+        const urlParams = new URLSearchParams(window.location.search);
+        const messageText = urlParams.get('text') || "我喜欢你";
+        const particleCount = 20000;
 
-        let isAnimated = false; // 是否已经触发动画
-        const messageText = "我喜欢你"; // 你想显示的文字
-        const fontUrl = 'https://unpkg.com/three@0.160.0/examples/fonts/helvetiker_regular.typeface.json'; // 默认字体，你也可以上传自己的
+        let scene, camera, renderer, particles;
+        let isAnimated = false;
+        
+        // 核心数据存储优化：使用 Float32Array 提升性能
+        const originalPositions = new Float32Array(particleCount * 3);
+        const targetPositions = new Float32Array(particleCount * 3);
 
-        // --- 初始化场景 ---
         function init() {
-            // 场景
             scene = new THREE.Scene();
-
-            // 摄像机
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
             camera.position.z = 100;
 
-            // 渲染器
             renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // 兼顾画质与性能
             renderer.setSize(window.innerWidth, window.innerHeight);
             document.getElementById('canvas-container').appendChild(renderer.domElement);
 
-            // 创建散乱的星空粒子
-            const starGeometry = new THREE.BufferGeometry();
-            const starPositions = [];
+            // 1. 初始化随机星海位置
+            const starPositions = new Float32Array(particleCount * 3);
             for (let i = 0; i < particleCount; i++) {
-                // 随机生成散乱位置
-                starPositions.push(Math.random() * 600 - 300);
-                starPositions.push(Math.random() * 600 - 300);
-                starPositions.push(Math.random() * 600 - 300);
-                originalPositions.push(new THREE.Vector3(starPositions[i * 3], starPositions[i * 3 + 1], starPositions[i * 3 + 2]));
+                const x = Math.random() * 600 - 300;
+                const y = Math.random() * 600 - 300;
+                const z = Math.random() * 600 - 300;
+                
+                // 存入当前几何体
+                starPositions[i * 3] = x;
+                starPositions[i * 3 + 1] = y;
+                starPositions[i * 3 + 2] = z;
+                
+                // 备份初始位置
+                originalPositions[i * 3] = x;
+                originalPositions[i * 3 + 1] = y;
+                originalPositions[i * 3 + 2] = z;
             }
-            starGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starPositions, 3));
+
+            const starGeometry = new THREE.BufferGeometry();
+            starGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
 
             const starMaterial = new THREE.PointsMaterial({
-                color: 0xffe0b2, // 暖黄色星光
+                color: 0xffe0b2,
                 size: 0.8,
                 transparent: true,
-                blending: THREE.AdditiveBlending, // 叠加模式
-                sizeAttenuation: true // 粒子大小随距离变化
+                blending: THREE.AdditiveBlending,
+                sizeAttenuation: true
             });
 
             particles = new THREE.Points(starGeometry, starMaterial);
             scene.add(particles);
 
-            // 加载字体
-            const loader = new FontLoader();
-            loader.load(fontUrl, function (font) {
-                document.querySelector('.loading-text').style.display = 'none';
-                document.getElementById('message').style.display = 'block';
-                createTextParticles(font);
-                animate(); // 字体加载完才开始动画循环
-            });
+            // 2. 预计算文字粒子目标位置 (Canvas 采样)
+            calculateTextTarget();
 
-            // 监听点击事件
+            // 3. 事件监听
             document.getElementById('message').addEventListener('click', startAnimation);
-
-            // 窗口自适应
             window.addEventListener('resize', onWindowResize);
+
+            animate();
         }
 
-        // --- 生成文字粒子目标位置 ---
-        function createTextParticles(font) {
-            const textMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff }); // 仅用于生成几何体
-            const textGeometry = new TextGeometry(messageText, {
-                font: font,
-                size: 20, // 文字大小
-                height: 2, // 文字厚度
-                curveSegments: 12,
-                bevelEnabled: false // 不需要斜角
-            });
+        function calculateTextTarget() {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = 400;
+            canvas.height = 100;
 
-            textGeometry.computeBoundingBox();
-            // 居中文本
-            textGeometry.translate(
-                - (textGeometry.boundingBox.max.x - textGeometry.boundingBox.min.x) / 2,
-                - (textGeometry.boundingBox.max.y - textGeometry.boundingBox.min.y) / 2,
-                - (textGeometry.boundingBox.max.z - textGeometry.boundingBox.min.z) / 2
-            );
+            ctx.fillStyle = 'white';
+            ctx.font = 'bold 60px "Microsoft YaHei", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(messageText, 200, 50);
 
-            // 获取文字几何体上的点
+            const imgData = ctx.getImageData(0, 0, 400, 100).data;
             const textPoints = [];
-            const positionAttribute = textGeometry.attributes.position;
-            for (let i = 0; i < positionAttribute.count; i++) {
-                const x = positionAttribute.getX(i);
-                const y = positionAttribute.getY(i);
-                const z = positionAttribute.getZ(i);
-                textPoints.push(new THREE.Vector3(x, y, z));
+
+            // 采样逻辑保留，视觉效果不变
+            for (let y = 0; y < 100; y += 3) {
+                for (let x = 0; x < 400; x += 3) {
+                    const alpha = imgData[(y * 400 + x) * 4 + 3];
+                    if (alpha > 128) {
+                        textPoints.push({ x: x - 200, y: (100 - y) - 50, z: 0 });
+                    }
+                }
             }
 
-            // 将文本点随机分配给散乱的粒子，不足的粒子保持原位或随机位置
-            targetPositions = [];
+            // 分配粒子目标
             for (let i = 0; i < particleCount; i++) {
-                if (i < textPoints.length) {
-                    targetPositions.push(textPoints[i]);
-                } else {
-                    // 多余的粒子可以散落在文字周围，或者保持原位
-                    targetPositions.push(originalPositions[i].clone());
-                }
-            }
-
-            // 如果文字点比粒子多，就随机选择粒子去填充
-            if (textPoints.length > particleCount) {
-                for (let i = 0; i < particleCount; i++) {
-                    targetPositions[i] = textPoints[Math.floor(Math.random() * textPoints.length)];
-                }
+                const target = i < textPoints.length ? textPoints[i] : {
+                    x: originalPositions[i * 3],
+                    y: originalPositions[i * 3 + 1],
+                    z: originalPositions[i * 3 + 2]
+                };
+                targetPositions[i * 3] = target.x;
+                targetPositions[i * 3 + 1] = target.y;
+                targetPositions[i * 3 + 2] = target.z;
             }
         }
 
-        // --- 启动粒子动画 ---
         function startAnimation() {
             if (isAnimated) return;
             isAnimated = true;
-            document.getElementById('message').style.display = 'none'; // 隐藏点击提示
+            document.getElementById('message').style.display = 'none';
 
-            const positions = particles.geometry.attributes.position;
-            const currentPositions = [];
-            for (let i = 0; i < positions.count; i++) {
-                currentPositions.push({ x: positions.getX(i), y: positions.getY(i), z: positions.getZ(i) });
-            }
-
-            // 动画每个粒子
+            const posAttr = particles.geometry.attributes.position;
+            
             for (let i = 0; i < particleCount; i++) {
-                const p = currentPositions[i]; // 粒子的当前位置
-                const targetP = targetPositions[i]; // 粒子的目标位置
+                // 为每个粒子创建 Tween
+                const current = { 
+                    x: posAttr.getX(i), 
+                    y: posAttr.getY(i), 
+                    z: posAttr.getZ(i) 
+                };
 
-                new TWEEN.Tween(p)
-                    .to({ x: targetP.x, y: targetP.y, z: targetP.z }, Math.random() * 2000 + 1500) // 随机动画时长
+                new TWEEN.Tween(current)
+                    .to({ 
+                        x: targetPositions[i * 3], 
+                        y: targetPositions[i * 3 + 1], 
+                        z: targetPositions[i * 3 + 2] 
+                    }, Math.random() * 2000 + 1500)
                     .easing(TWEEN.Easing.Exponential.InOut)
                     .onUpdate(() => {
-                        positions.setXYZ(i, p.x, p.y, p.z);
-                        positions.needsUpdate = true;
+                        posAttr.setXYZ(i, current.x, current.y, current.z);
+                        posAttr.needsUpdate = true;
                     })
-                    .delay(Math.random() * 500) // 随机延迟，增加错落感
+                    .delay(Math.random() * 500)
                     .start();
             }
         }
 
-        // --- 动画循环 ---
         function animate(time) {
             requestAnimationFrame(animate);
-
-            TWEEN.update(time); // 更新Tween动画
-
-            particles.rotation.y += 0.0005; // 星空背景缓慢自转
+            TWEEN.update(time);
+            
+            // 保留原有的星海旋转视觉
+            particles.rotation.y += 0.0005;
             particles.rotation.x += 0.0002;
-
+            
             renderer.render(scene, camera);
         }
 
-        // --- 窗口自适应 ---
         function onWindowResize() {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
         }
 
-        init(); // 页面加载后立即初始化
+        init(); 
     </script>
 </body>
-
 </html>
