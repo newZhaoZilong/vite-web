@@ -33,10 +33,18 @@
     <script type="module">
         import * as THREE from 'three';
 
+        // --- 参数解析部分 ---
         const urlParams = new URLSearchParams(window.location.search);
-        const starColorStr = urlParams.get('color') ? '#' + urlParams.get('color') : '#88bbff';
-        const starCount = 18000;
 
+        // 1. 颜色参数 (例如: ?color=ff0000)
+        const starColorStr = urlParams.get('color') ? '#' + urlParams.get('color') : '#88bbff';
+
+
+        // 2. 旋转速度参数 (例如: ?speed=0.01)
+        // 默认为 0.0002，如果传入不是数字则使用默认值
+        const rotationSpeed = urlParams.get('speed') ? parseFloat(urlParams.get('speed')) : 0.0002;
+
+        const starCount = 18000;
         let scene, camera, renderer, stars, meteors = [];
 
         class Meteor {
@@ -60,20 +68,14 @@
             }
 
             reset() {
-                // 随机起始位置
                 this.mesh.position.set(
                     (Math.random() - 0.5) * 2000 + 400,
                     (Math.random() - 0.5) * 800 + 500,
                     (Math.random() - 0.5) * 600
                 );
-
-                // --- 提速逻辑 ---
-                // 设置在中高速区间，保证划过的力度感
                 this.speedX = 8 + Math.random() * 8;
                 this.speedY = this.speedX * 0.45;
-
                 this.active = false;
-                // 较长的等待时间，保持稀疏感
                 this.wait = 150 + Math.random() * 600;
                 this.material.opacity = 0;
             }
@@ -82,16 +84,12 @@
                 if (!this.active) {
                     if (this.wait-- <= 0) {
                         this.active = true;
-                        this.material.opacity = 0.95; // 初始透明度低（即更不透明/更亮）
+                        this.material.opacity = 0.95;
                     }
                     return;
                 }
-
                 this.mesh.position.x -= this.speedX;
                 this.mesh.position.y -= this.speedY;
-
-                // --- 调整消失速度 ---
-                // 衰减稍微加快，配合高速飞行，产生干脆利落的效果
                 this.material.opacity -= 0.012;
 
                 const pos = this.mesh.geometry.attributes.position.array;
@@ -121,7 +119,6 @@
 
             createStars();
 
-            // 保持 5 颗，画面简洁
             for (let i = 0; i < 5; i++) {
                 meteors.push(new Meteor());
             }
@@ -190,7 +187,8 @@
             const t = (time || 0) * 0.001;
             if (stars) {
                 stars.material.uniforms.time.value = t;
-                stars.rotation.y += 0.0002;
+                // --- 使用动态参数控制旋转速度 ---
+                stars.rotation.y += rotationSpeed;
             }
             meteors.forEach(m => m.update());
             renderer.render(scene, camera);
